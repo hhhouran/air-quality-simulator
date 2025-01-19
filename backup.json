@@ -1,0 +1,23 @@
+{
+    "version": 1,
+    "author": "Hussein Hourani",
+    "editor": "wokwi",
+    "parts": [
+      { "type": "wokwi-arduino-uno", "id": "uno", "top": 87, "left": 143.4, "attrs": {} },
+      { "type": "wokwi-lcd1602", "id": "lcd1", "top": -111.77, "left": 131.2, "attrs": {} }
+    ],
+    "connections": [
+      [ "lcd1:RS", "uno:12", "red", [ "v0" ] ],
+      [ "lcd1:E", "uno:11", "cyan", [ "v0" ] ],
+      [ "lcd1:D4", "uno:5", "green", [ "v0" ] ],
+      [ "lcd1:D5", "uno:4", "green", [ "v0" ] ],
+      [ "lcd1:D6", "uno:3", "green", [ "v0" ] ],
+      [ "lcd1:D7", "uno:2", "green", [ "v0" ] ],
+      [ "lcd1:RW", "uno:GND.2", "blue", [ "v0" ] ],
+      [ "lcd1:VSS", "uno:GND.3", "blue", [ "v0" ] ],
+      [ "lcd1:VDD", "uno:5V", "magenta", [ "v0" ] ],
+      [ "lcd1:A", "uno:5V", "white", [ "v0" ] ],
+      [ "lcd1:K", "uno:GND.2", "white", [ "v0" ] ]
+    ],
+    "dependencies": {}
+  }

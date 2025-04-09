@@ -1,30 +1,111 @@
-#include <Arduino.h>
-#include <LiquidCrystal.h>
-#include <Adafruit_Sensor.h>
+#include <WiFi.h>
+#include <HTTPClient.h>
 #include <DHT.h>
+#include <LiquidCrystal_I2C.h>
+#include <Wire.h>
 
-// The values below are initializing the connectors from the lcd to the board
-// We then instiantiate the LiquidCrystal object with the values
-const int rs = 12, en = 11, d4 = 5, d5 = 4, d6 = 3, d7 = 2;
-float temperature = 0;
-float humidity = 0;
+// --- Sensor & Pin Definitions ---
+#define DHTPIN 4          
+#define DHTTYPE DHT22      
+DHT dht(DHTPIN, DHTTYPE);
 
-LiquidCrystal lcd(rs, en, d4, d5, d6, d7);
-DHT dht = DHT(A0, DHT11);
+const int mq2Pin = 34;
+const int ledPin = 26;
+const int buzzerPin = 25;
 
-void setup()
-{
-  // Begin method is configuring our rows/columns of our lcd
-  humidity = dht.readHumidity(true);
-  temperature = dht.readTemperature(true, false);
-  lcd.begin(16, 2);
+// --- LCD Setup ---
+LiquidCrystal_I2C lcd(0x27, 16, 2);  
+
+// --- WiFi & ThingSpeak ---
+const char* ssid = "Wokwi-GUEST";
+const char* password = "";
+const char* thingSpeakServer = "api.thingspeak.com";
+String apiKey = "562C98N8KMSDTNNX";
+
+
+// --- PPM Threshold ---
+int MQ2Threshold = 3500;  // You can adjust based on environment
+
+
+void setup() {
+  Serial.begin(115200);
+  
+  pinMode(ledPin, OUTPUT);
+  pinMode(buzzerPin, OUTPUT);
+  digitalWrite(ledPin, LOW);
+  digitalWrite(buzzerPin, LOW);
+  
+  dht.begin();
+  Wire.begin(21, 22);
+  lcd.init();
+  lcd.backlight();
+
+  WiFi.begin(ssid, password);
+  Serial.print("Connecting to WiFi");
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+  Serial.println("\nConnected to WiFi");
 }
 
-void loop()
-{
-  lcd.setCursor(0, 0);
-  lcd.print("Temp: " + String(temperature) + "F ");
-  lcd.autoscroll();
-  delay(2000);
-  lcd.print("Humidity: " + String(humidity) + "% ");
+void loop() {
+  int mqValue = analogRead(mq2Pin);   // Raw ADC value
+
+  float temperature = dht.readTemperature(false);
+  float humidity = dht.readHumidity(true);
+
+  if (isnan(temperature) || isnan(humidity)) {
+    Serial.println("Failed to read from DHT sensor!");
+    delay(2000);
+    return;
+  }
+
+  lcd.clear();
+  if (mqValue > MQ2Threshold) {
+    digitalWrite(ledPin, HIGH);
+    tone(buzzerPin, 1000);
+    lcd.setCursor(0, 0);
+    lcd.print("  DANGER(SMOKE)");
+  } else {
+    digitalWrite(ledPin, LOW);
+    noTone(buzzerPin);
+    lcd.setCursor(0, 0);
+    lcd.print("Air Quality Safe");
+  }
+
+  lcd.setCursor(0, 1);
+  lcd.print("T:");
+  lcd.print(temperature);
+  lcd.print("CH:");
+  lcd.print(humidity);
+  lcd.print("%");
+
+  Serial.println("---- Sensor Readings ----");
+  Serial.println("MQ2 Value  : " + String(mqValue));
+  Serial.println("Temperature    : " + String(temperature) + " °C");
+  Serial.println("Humidity       : " + String(humidity) + " %");
+
+  if (WiFi.status() == WL_CONNECTED) {
+    WiFiClient client;
+    HTTPClient http;
+
+    String url = String("http://") + thingSpeakServer + "/update?api_key=" + apiKey +
+                 "&field1=" + String(mqValue) +
+                 "&field2=" + String(temperature) +
+                 "&field3=" + String(humidity);
+
+    http.begin(client, url);
+    int httpCode = http.GET();
+    if (httpCode > 0) {
+      Serial.printf("Data sent! HTTP GET code: %d\n", httpCode);
+    } else {
+      Serial.printf("Error in GET request: %s\n", http.errorToString(httpCode).c_str());
+    }
+    http.end();
+  } else {
+    Serial.println("WiFi not connected");
+  }
+
+  delay(2000); // Delay between updates (ThingSpeak minimum = 15s for free accounts)
 }
